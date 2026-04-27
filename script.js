@@ -82,4 +82,24 @@
 //  for while do-while forin foreach
 
 
+// function to arrow function 
+// function multiple(a,b){
+//   return a*b;
+// }
 
+// let multiple =(a,b)=>{
+//   return a*b;
+// }
+//    write a BMI caculator
+// function bmi(weight,height){
+//     return weight/(height*height);
+// }
+// console.log(bmi(69,1.7).toFixed(2));
+// function discountCalculator(discount){
+//     return function(price){
+//         return price- price*(discount/100)
+
+//     }
+// }
+//  let dicounter=discountCalculator(10);
+//  console.log(dicounter(200))
