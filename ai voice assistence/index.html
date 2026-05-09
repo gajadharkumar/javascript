@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ARIA — AI Voice Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07080d;
+      --surface: #0f1117;
+      --border: #1e2130;
+      --accent: #00e5ff;
+      --accent2: #7c3aed;
+      --text: #e8eaf0;
+      --muted: #4a5068;
+      --danger: #ff4f6a;
+      --glow: 0 0 40px rgba(0, 229, 255, 0.18);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: -30%;
+      left: -20%;
+      width: 70%;
+      height: 70%;
+      background: radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    @keyframes drift {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(15%,10%) scale(1.1); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 700px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    .brand {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2rem, 6vw, 3.2rem);
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--accent) 0%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Language toggle */
+    .lang-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+    }
+
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 6px 14px;
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.1em;
+      transition: all 0.2s;
+    }
+
+    .lang-btn.active {
+      background: rgba(0,229,255,0.12);
+      color: var(--accent);
+    }
+
+    .lang-btn:not(:last-child) {
+      border-right: 1px solid var(--border);
+    }
+
+    /* Orb */
+    .orb-wrapper {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(0,229,255,0.15);
+      animation: ringPulse 3s ease-in-out infinite;
+    }
+    .orb-ring:nth-child(1) { width: 200px; height: 200px; animation-delay: 0s; }
+    .orb-ring:nth-child(2) { width: 160px; height: 160px; animation-delay: 0.6s; }
+    .orb-ring:nth-child(3) { width: 120px; height: 120px; animation-delay: 1.2s; }
+
+    @keyframes ringPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(1.04); }
+    }
+
+    .orb {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #00e5ff, #7c3aed 60%, #07080d);
+      box-shadow: 0 0 60px rgba(0,229,255,0.35), 0 0 120px rgba(124,58,237,0.2);
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .orb:hover { transform: scale(1.07); box-shadow: 0 0 80px rgba(0,229,255,0.5), 0 0 150px rgba(124,58,237,0.3); }
+    .orb.listening { animation: orbPulse 1s ease-in-out infinite; }
+    .orb.speaking  { animation: orbSpeak 0.5s ease-in-out infinite alternate; }
+
+    @keyframes orbPulse {
+      0%, 100% { box-shadow: 0 0 60px rgba(0,229,255,0.35), 0 0 120px rgba(124,58,237,0.2); }
+      50%       { box-shadow: 0 0 100px rgba(255,79,106,0.6), 0 0 160px rgba(255,79,106,0.3); }
+    }
+    @keyframes orbSpeak {
+      from { box-shadow: 0 0 60px rgba(0,229,255,0.4), 0 0 120px rgba(124,58,237,0.25); transform: scale(1); }
+      to   { box-shadow: 0 0 90px rgba(0,229,255,0.7), 0 0 180px rgba(124,58,237,0.4); transform: scale(1.04); }
+    }
+
+    .mic-icon { width: 32px; height: 32px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .waveform { display: flex; align-items: center; gap: 3px; height: 36px; }
+    .bar { width: 3px; border-radius: 2px; background: var(--accent); height: 4px; transition: height 0.1s; opacity: 0.4; }
+    .waveform.active .bar { opacity: 1; animation: barBounce 0.6s ease-in-out infinite alternate; }
+    .bar:nth-child(1) { animation-delay: 0s; }
+    .bar:nth-child(2) { animation-delay: 0.07s; }
+    .bar:nth-child(3) { animation-delay: 0.14s; }
+    .bar:nth-child(4) { animation-delay: 0.21s; }
+    .bar:nth-child(5) { animation-delay: 0.28s; }
+    .bar:nth-child(6) { animation-delay: 0.21s; }
+    .bar:nth-child(7) { animation-delay: 0.14s; }
+    .bar:nth-child(8) { animation-delay: 0.07s; }
+    .bar:nth-child(9) { animation-delay: 0s; }
+    @keyframes barBounce { from { height: 4px; } to { height: 28px; } }
+
+    .status-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+    .status-dot.ready    { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .status-dot.listening{ background: var(--danger); box-shadow: 0 0 8px var(--danger); animation: blink 1s infinite; }
+    .status-dot.speaking { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+    .status-dot.thinking { background: #facc15; box-shadow: 0 0 8px #facc15; animation: blink 0.8s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    /* Chat */
+    .chat-box {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chat-header::before { display: none; }
+    .chat-header-left::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .clear-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .clear-btn:hover { color: var(--danger); }
+
+    .messages {
+      height: 260px;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .message {
+      max-width: 90%;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      padding: 10px 14px;
+      border-radius: 12px;
+      animation: fadeUp 0.3s ease;
+    }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(0,229,255,0.12), rgba(124,58,237,0.12));
+      border: 1px solid rgba(0,229,255,0.2);
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+    }
+
+    .message .label {
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+      opacity: 0.5;
+    }
+
+    .message.user .label { color: var(--accent); }
+    .message.assistant .label { color: #a78bfa; }
+
+    .typing-dots { display: inline-flex; gap: 4px; align-items: center; padding: 4px 0; }
+    .typing-dots span { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; animation: dotBounce 1.2s infinite; }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotBounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+
+    /* Error */
+    .error-msg { color: var(--danger); font-size: 0.75rem; }
+
+    /* Input */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      align-items: center;
+    }
+
+    .text-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      caret-color: var(--accent);
+    }
+    .text-input::placeholder { color: var(--muted); }
+
+    .btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      padding: 7px 14px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.08em;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(0,229,255,0.15); }
+    .btn.primary {
+      background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(124,58,237,0.15));
+      border-color: rgba(0,229,255,0.3);
+      color: var(--accent);
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Controls */
+    .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+
+    .mic-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 28px;
+      border-radius: 50px;
+      border: 1px solid rgba(0,229,255,0.3);
+      background: linear-gradient(135deg, rgba(0,229,255,0.1), rgba(124,58,237,0.1));
+      color: var(--accent);
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .mic-btn:hover { background: linear-gradient(135deg, rgba(0,229,255,0.2), rgba(124,58,237,0.2)); box-shadow: var(--glow); transform: translateY(-1px); }
+    .mic-btn.active { background: linear-gradient(135deg, rgba(255,79,106,0.2), rgba(255,79,106,0.05)); border-color: rgba(255,79,106,0.4); color: var(--danger); animation: btnPulse 1s ease-in-out infinite; }
+    @keyframes btnPulse { 0%, 100% { box-shadow: 0 0 0 rgba(255,79,106,0); } 50% { box-shadow: 0 0 20px rgba(255,79,106,0.3); } }
+    .mic-btn:disabled { opacity: 0.4; cursor: not-allowed; animation: none; }
+
+    .stop-btn {
+      padding: 12px 20px;
+      border-radius: 50px;
+      border: 1px solid rgba(255,79,106,0.3);
+      background: rgba(255,79,106,0.08);
+      color: var(--danger);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: none;
+    }
+    .stop-btn.visible { display: flex; align-items: center; gap: 6px; }
+    .stop-btn:hover { background: rgba(255,79,106,0.18); box-shadow: 0 0 16px rgba(255,79,106,0.2); }
+
+    footer { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.1em; opacity: 0.5; text-align: center; }
+
+    .no-support { background: rgba(255,79,106,0.08); border: 1px solid rgba(255,79,106,0.25); border-radius: 10px; padding: 10px 16px; font-size: 0.72rem; color: var(--danger); display: none; }
+
+    /* API error banner */
+    .api-banner {
+      width: 100%;
+      background: rgba(250,204,21,0.07);
+      border: 1px solid rgba(250,204,21,0.2);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.68rem;
+      color: #facc15;
+      display: none;
+      text-align: center;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="brand">ARIA</div>
+    <div class="tagline">Adaptive Real-time Intelligence Assistant</div>
+  </header>
+
+  <div class="lang-toggle">
+    <button class="lang-btn active" data-lang="auto" onclick="setLang('auto')">🌐 Auto Detect</button>
+    <button class="lang-btn" data-lang="hi" onclick="setLang('hi')">हिंदी</button>
+    <button class="lang-btn" data-lang="en" onclick="setLang('en')">English</button>
+  </div>
+
+  <div class="no-support" id="noSupport">
+    ⚠ Browser Web Speech API support नहीं है। Chrome या Edge use करें।
+  </div>
+
+  <div class="api-banner" id="apiBanner">
+    ⚠ API response failed — check your network connection.
+  </div>
+
+  <div class="orb-wrapper">
+    <div class="orb-ring"></div>
+    <div class="orb-ring"></div>
+    <div class="orb-ring"></div>
+    <div class="orb" id="orb" title="Click to speak / बोलने के लिए क्लिक करें">
+      <svg class="mic-icon" viewBox="0 0 24 24">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M19 10a7 7 0 01-14 0"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+        <line x1="8"  y1="22" x2="16" y2="22"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="waveform" id="waveform">
+    <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+    <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+  </div>
+
+  <div class="status-row">
+    <div class="status-dot ready" id="statusDot"></div>
+    <span id="statusText">Ready / तैयार</span>
+  </div>
+
+  <div class="chat-box">
+    <div class="chat-header">
+      <div class="chat-header-left">Conversation Log / बातचीत</div>
+      <button class="clear-btn" onclick="clearChat()">✕ Clear</button>
+    </div>
+    <div class="messages" id="messages">
+      <div class="message assistant">
+        <div class="label">ARIA</div>
+        नमस्ते! मैं ARIA हूँ — आपकी AI voice assistant। आप हिंदी या English में बात कर सकते हैं। Orb पर click करें, mic button दबाएं, या नीचे type करें।
+        <br><br>
+        Hello! I'm ARIA. You can speak or type in <strong>Hindi or English</strong> — I'll detect it automatically and respond in the same language!
+      </div>
+    </div>
+    <div class="input-row">
+      <input class="text-input" id="textInput" type="text" placeholder="Type in Hindi or English… / हिंदी या English में लिखें…" autocomplete="off"/>
+      <button class="btn primary" id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="mic-btn" id="micBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap: round stroke-linejoin="round">
+        <rect x="9" y="2" width="6" height="11" rx="3"/>
+        <path d="M19 10a7 7 0 01-14 0"/>
+        <line x1="12" y1="19" x2="12" y2="22"/>
+      </svg>
+      बोलें / Speak
+    </button>
+    <button class="stop-btn" id="stopBtn">■ Stop</button>
+  </div>
+
+  <footer>Claude API · Web Speech API · Hindi + English Bilingual</footer>
+
+</div>
+
+<script>
+  // ─── State ───────────────────────────────────────────────────────────────────
+  const orb        = document.getElementById('orb');
+  const waveform   = document.getElementById('waveform');
+  const statusDot  = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const messagesEl = document.getElementById('messages');
+  const textInput  = document.getElementById('textInput');
+  const sendBtn    = document.getElementById('sendBtn');
+  const micBtn     = document.getElementById('micBtn');
+  const stopBtn    = document.getElementById('stopBtn');
+  const noSupport  = document.getElementById('noSupport');
+  const apiBanner  = document.getElementById('apiBanner');
+
+  let recognition      = null;
+  let synth            = window.speechSynthesis;
+  let isListening      = false;
+  let isSpeaking       = false;
+  let isThinking       = false;
+  let selectedLang     = 'auto'; // 'auto' | 'hi' | 'en'
+  let conversationHistory = [];
+
+  // ─── Language Settings ────────────────────────────────────────────────────────
+  function setLang(lang) {
+    selectedLang = lang;
+    document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+    if (recognition) {
+      const langMap = { auto: 'hi-IN', hi: 'hi-IN', en: 'en-US' };
+      // For auto, we use both — set to hi-IN and let content detection handle it
+      recognition.lang = langMap[lang] || 'hi-IN';
+    }
+  }
+
+  // Detect if text contains Hindi/Devanagari characters
+  function detectLanguage(text) {
+    if (selectedLang !== 'auto') return selectedLang;
+    // Devanagari unicode range
+    const hindiRegex = /[\u0900-\u097F]/;
+    return hindiRegex.test(text) ? 'hi' : 'en';
+  }
+
+  // ─── Speech Recognition ───────────────────────────────────────────────────────
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    noSupport.style.display = 'block';
+    micBtn.disabled = true;
+    orb.style.cursor = 'default';
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'hi-IN'; // Start with Hindi; auto mode
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+      if (e.results[e.results.length - 1].isFinal) {
+        stopListening();
+        if (transcript.trim()) {
+          addMessage('user', transcript.trim());
+          processInput(transcript.trim());
+        }
+      }
+    };
+
+    recognition.onerror = () => stopListening();
+    recognition.onend   = () => { if (isListening) stopListening(); };
+  }
+
+  // ─── UI Helpers ───────────────────────────────────────────────────────────────
+  function setStatus(state, label) {
+    statusDot.className = `status-dot ${state}`;
+    const labels = {
+      ready:     'Ready / तैयार',
+      listening: 'Listening… / सुन रहा हूँ…',
+      speaking:  'Speaking… / बोल रहा हूँ…',
+      thinking:  'Thinking… / सोच रहा हूँ…'
+    };
+    statusText.textContent = label || labels[state] || state;
+    orb.className = `orb ${state === 'listening' ? 'listening' : state === 'speaking' ? 'speaking' : ''}`;
+    waveform.className = `waveform ${(state === 'listening' || state === 'speaking') ? 'active' : ''}`;
+  }
+
+  function addMessage(role, text, isTyping = false) {
+    const div = document.createElement('div');
+    div.className = `message ${role === 'user' ? 'user' : 'assistant'}`;
+    div.innerHTML = `<div class="label">${role === 'user' ? 'YOU / आप' : 'ARIA'}</div>`;
+    if (isTyping) {
+      div.id = 'typing-indicator';
+      div.innerHTML += `<div class="typing-dots"><span></span><span></span><span></span></div>`;
+    } else {
+      div.innerHTML += text;
+    }
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function removeTyping() {
+    const t = document.getElementById('typing-indicator');
+    if (t) t.remove();
+  }
+
+  function clearChat() {
+    messagesEl.innerHTML = '';
+    conversationHistory = [];
+    addMessage('assistant', 'Chat clear हो गया! नई बातचीत शुरू करें।<br>Chat cleared! Start a new conversation.');
+  }
+
+  // ─── Mic Controls ─────────────────────────────────────────────────────────────
+  function startListening() {
+    if (!recognition || isListening || isSpeaking || isThinking) return;
+    stopSpeaking();
+    isListening = true;
+    setStatus('listening');
+    micBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10a7 7 0 01-14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg> सुन रहा हूँ…`;
+    micBtn.classList.add('active');
+    stopBtn.classList.add('visible');
+    // For auto mode, accept both Hindi and English
+    if (selectedLang === 'auto') recognition.lang = 'hi-IN';
+    recognition.start();
+  }
+
+  function stopListening() {
+    if (!isListening) return;
+    isListening = false;
+    micBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10a7 7 0 01-14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg> बोलें / Speak`;
+    micBtn.classList.remove('active');
+    stopBtn.classList.remove('visible');
+    if (!isSpeaking && !isThinking) setStatus('ready');
+    try { recognition.stop(); } catch(e) {}
+  }
+
+  function stopSpeaking() {
+    if (synth) synth.cancel();
+    isSpeaking = false;
+    stopBtn.classList.remove('visible');
+    if (!isThinking) setStatus('ready');
+  }
+
+  // ─── Claude API Call ──────────────────────────────────────────────────────────
+  async function callClaudeAPI(userText, detectedLang) {
+    const langInstruction = detectedLang === 'hi'
+      ? 'User ne Hindi mein pucha hai. Apna jawab SIRF Hindi mein do (Devanagari script mein). Jawab seedha aur helpful hona chahiye.'
+      : 'The user asked in English. Respond in English only. Be concise, helpful, and friendly.';
+
+    const systemPrompt = `You are ARIA (Adaptive Real-time Intelligence Assistant), a helpful bilingual AI voice assistant supporting Hindi and English.
+
+${langInstruction}
+
+Rules:
+- Keep responses concise (2-4 sentences max for voice output)
+- Be warm, helpful, and natural
+- For Hindi responses: use simple, conversational Hindi with Devanagari script
+- For English responses: be clear and friendly
+- Do NOT mix languages in one response unless specifically asked`;
+
+    const messages = [
+      ...conversationHistory,
+      { role: 'user', content: userText }
+    ];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': '',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages
+      })
+    });
+
+    if (!response.ok) throw new Error(`API error ${response.status}`);
+
+    const data = await response.json();
+    const reply = data.content.map(c => c.text || '').join('').trim();
+
+    // Update conversation history (keep last 10 turns)
+    conversationHistory.push({ role: 'user', content: userText });
+    conversationHistory.push({ role: 'assistant', content: reply });
+    if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+
+    return reply;
+  }
+
+  // ─── Process Input ────────────────────────────────────────────────────────────
+  async function processInput(text) {
+    if (isThinking) return;
+    isThinking = true;
+    sendBtn.disabled = true;
+
+    const detectedLang = detectLanguage(text);
+    setStatus('thinking');
+    addMessage('assistant', '', true);
+    apiBanner.style.display = 'none';
+
+    try {
+      const reply = await callClaudeAPI(text, detectedLang);
+      removeTyping();
+      addMessage('assistant', formatReply(reply));
+      speak(reply, detectedLang);
+    } catch (err) {
+      removeTyping();
+      apiBanner.style.display = 'block';
+      const errMsg = detectedLang === 'hi'
+        ? 'माफ़ करें, कुछ गड़बड़ हो गई। Please check your internet connection और दोबारा try करें।'
+        : 'Sorry, something went wrong. Please check your internet connection and try again.';
+      addMessage('assistant', `<span class="error-msg">⚠ ${errMsg}</span>`);
+    } finally {
+      isThinking = false;
+      sendBtn.disabled = false;
+      if (!isSpeaking) setStatus('ready');
+    }
+  }
+
+  // Make links/line breaks HTML-safe
+  function formatReply(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n\n/g, '<br><br>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // ─── Text-to-Speech ───────────────────────────────────────────────────────────
+  function speak(text, lang) {
+    if (!synth) return;
+    synth.cancel();
+    // Strip HTML tags for TTS
+    const plainText = text.replace(/<[^>]*>/g, '');
+    const utt = new SpeechSynthesisUtterance(plainText);
+    utt.rate  = 1.0;
+    utt.pitch = 1.0;
+    utt.volume = 1;
+
+    const voices = synth.getVoices();
+    if (lang === 'hi') {
+      const hindiVoice = voices.find(v => v.lang.startsWith('hi'));
+      if (hindiVoice) utt.voice = hindiVoice;
+      utt.lang = 'hi-IN';
+    } else {
+      const engVoice = voices.find(v => /Google UK English Female|Samantha|Karen|Moira/.test(v.name))
+                    || voices.find(v => v.lang === 'en-US' && v.localService)
+                    || voices.find(v => v.lang.startsWith('en'));
+      if (engVoice) utt.voice = engVoice;
+      utt.lang = 'en-US';
+    }
+
+    utt.onstart = () => { isSpeaking = true; setStatus('speaking'); stopBtn.classList.add('visible'); };
+    utt.onend   = () => { isSpeaking = false; stopBtn.classList.remove('visible'); setStatus('ready'); };
+    utt.onerror = () => { isSpeaking = false; stopBtn.classList.remove('visible'); setStatus('ready'); };
+
+    synth.speak(utt);
+  }
+
+  // ─── Events ───────────────────────────────────────────────────────────────────
+  orb.addEventListener('click', () => { if (isListening) stopListening(); else startListening(); });
+  micBtn.addEventListener('click', () => { if (isListening) stopListening(); else startListening(); });
+  stopBtn.addEventListener('click', () => { stopListening(); stopSpeaking(); });
+  sendBtn.addEventListener('click', handleSend);
+  textInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSend(); });
+
+  function handleSend() {
+    const text = textInput.value.trim();
+    if (!text || isThinking) return;
+    textInput.value = '';
+    addMessage('user', text);
+    processInput(text);
+  }
+
+  if (synth) {
+    synth.getVoices();
+    synth.onvoiceschanged = () => synth.getVoices();
+  }
+</script>
+</body>
+</html>
